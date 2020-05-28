@@ -30,6 +30,10 @@ pub fn tokenize(s: &str) -> Vec<String> {
             ')' => {
                 if buffer.borrow().starts_with("\"") {
                     buffer.borrow_mut().push(c);
+                    if buffer.borrow().ends_with("\"") {
+                        output.borrow_mut().push(buffer.borrow().to_string());
+                        buffer.borrow_mut().clear();
+                    }
                 } else { //normal case
                     if buffer.borrow().len() != 0 {
                         output.borrow_mut().push(buffer.borrow().to_string());
@@ -56,5 +60,8 @@ mod tests {
         assert_eq!(
             vec!["(", "def", "plus", "(", "fn", "(", "x", "y", ")", "(", "+", "x", "y", ")", ")", ")"]
             , tokenize("(def plus (fn (x y) (+ x y)))"));
+        assert_eq!(
+            vec!["(", "def", "plus", "(", "fn", "(", "x", "y", ")", "(", "+", "x", "y", ")", ")", ")"]
+            , tokenize("(def plus (fn (x y) (+ \"piyo\" \"fuga\")))"));
     }
 }
