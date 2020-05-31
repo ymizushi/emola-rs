@@ -61,15 +61,27 @@ pub enum Tree<T> {
     Node(Vec<Tree<T>>)
 }
 
-pub fn parse(v: Vec<&str>) -> Tree<&str> {
+pub fn parse<'a>(v: &'a [&str]) -> Tree<&'a str> {
     use Tree::*;
+    let result = Node(vec![]);
     for (i, iv) in v.into_iter().enumerate() {
-        match iv {
-            "(" => parse(v),
-            ")" => Atom("hoge"),
-            s => Atom(s)
+        match *iv {
+            "(" => return parse(&v[i..v.len()]),
+            ")" => return result,
+            s => {
+                match result {
+                    Node(mut n) => {
+                        n.push(Atom(s));
+                        return Node(n)
+                    },
+                    Atom(_) => {
+                        return result;
+                    }
+                }
+            }
         }
     }
+    return Atom("end")
 }
 
 #[cfg(test)]
