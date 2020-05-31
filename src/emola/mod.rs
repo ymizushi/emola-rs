@@ -63,22 +63,13 @@ pub enum Tree<T> {
 
 pub fn parse(v: Vec<&str>) -> Tree<&str> {
     use Tree::*;
-    v.into_iter().enumerate().fold(Node(vec![]), |acc, (i, x)| {
-        match acc {
-            Node(v) => {
-                match x {
-                    "(" => {
-                        Node(v)
-                    }
-                    ")" => {
-                        Node(v)
-                    }
-                    _ => Node(v)
-                }
-            }
-            _ => acc
+    for (i, iv) in v.into_iter().enumerate() {
+        match iv {
+            "(" => parse(v),
+            ")" => Atom("hoge"),
+            s => Atom(s)
         }
-    })
+    }
 }
 
 #[cfg(test)]
