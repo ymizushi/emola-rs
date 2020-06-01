@@ -55,33 +55,42 @@ pub fn tokenize(s: &str) -> Vec<String> {
     output.into_inner()
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Tree<T> {
-    Atom(T),
+    Leaf(T),
     Node(Vec<Tree<T>>)
 }
 
-pub fn parse<'a>(v: &'a [&str]) -> Tree<&'a str> {
+pub fn parse<'a>(v: &'a [&str]) -> (usize, Tree<&'a str>) {
     use Tree::*;
-    let result = Node(vec![]);
-    for (i, iv) in v.into_iter().enumerate() {
-        match *iv {
-            "(" => return parse(&v[i..v.len()]),
-            ")" => return result,
+    let mut result = Node(vec![]);
+    let mut index = 0;
+    while index < v.len() {
+        println!("{:?}", result);
+        match v[index] {
+            "(" => {
+                match result {
+                    Node(ref mut n) => {
+                        let (end_index, t) = parse(&v[index+1..v.len()]);
+                        (*n).push(t);
+                        index = index + end_index;
+                    },
+                    _ => {}
+                }
+            },
+            ")" => return (index, result),
             s => {
                 match result {
-                    Node(mut n) => {
-                        n.push(Atom(s));
-                        return Node(n)
+                    Node(ref mut n) => {
+                       (*n).push(Leaf(s));
                     },
-                    Atom(_) => {
-                        return result;
-                    }
+                    _ => {}
                 }
             }
         }
+        index += 1
     }
-    return Atom("end")
+    (v.len()-1, result)
 }
 
 #[cfg(test)]
@@ -95,6 +104,13 @@ mod tests {
         assert_eq!(
             vec!["(", "def", "plus", "(", "fn", "(", "x", "y", ")", "(", "+", "\"piyo\"", "\"fuga\"", ")", ")", ")"]
             , tokenize("(def plus (fn (x y) (+ \"piyo\" \"fuga\")))"));
+    }
+
+    #[test]
+    fn test_parse() {
+        assert_eq!(
+            (8, Tree::Leaf("10"))
+            , parse(&["(", "def", "plus", "(", "fn", "(", "x", "y", ")", "(", "+", "x", "y", ")", ")", ")"]));
     }
 
 }
