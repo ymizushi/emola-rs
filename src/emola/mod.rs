@@ -61,36 +61,35 @@ pub enum Tree<T> {
     Node(Vec<Tree<T>>)
 }
 
-pub fn parse<'a>(v: &'a [&str]) -> (usize, Tree<&'a str>) {
+pub fn parse<'a>(iterator: &mut std::iter::Peekable<std::slice::Iter<'_, &'a str>>) -> Tree<&'a str> {
     use Tree::*;
-    let mut result = Node(vec![]);
-    let mut index = 0;
-    while index < v.len() {
-        println!("{:?}", result);
-        match v[index] {
-            "(" => {
-                match result {
-                    Node(ref mut n) => {
-                        let (end_index, t) = parse(&v[index+1..v.len()]);
-                        (*n).push(t);
-                        index = index + end_index;
-                    },
-                    _ => {}
-                }
-            },
-            ")" => return (index, result),
-            s => {
-                match result {
-                    Node(ref mut n) => {
-                       (*n).push(Leaf(s));
-                    },
-                    _ => {}
+    let first = iterator.next().unwrap();
+    match first {
+        &"(" => {
+            let mut node = Node(vec![]);
+            match node {
+                Node(ref mut iv) => {
+                    loop {
+                        if iterator.peek().unwrap() == &&")" {
+                            iterator.next();
+                            return node
+                        } else {
+                            iv.push(parse(iterator));
+                        }
+                    }
+                },
+                _ => {
+                    panic!("")
                 }
             }
         }
-        index += 1
+        &")" => {
+            panic!("unknowo error");
+        }
+        _ => {
+            return Leaf(first)
+        }
     }
-    (v.len()-1, result)
 }
 
 #[cfg(test)]
@@ -108,9 +107,10 @@ mod tests {
 
     #[test]
     fn test_parse() {
+        use super::Tree::*;
         assert_eq!(
-            (8, Tree::Leaf("10"))
-            , parse(&["(", "def", "plus", "(", "fn", "(", "x", "y", ")", "(", "+", "x", "y", ")", ")", ")"]));
+            Node(vec![Leaf("def"), Leaf("plus"), Node(vec![Leaf("fn"), Node(vec![Leaf("x"), Leaf("y")]), Node(vec![Leaf("+"), Leaf("x"), Leaf("y")])])])
+            , parse(&mut vec!["(", "def", "plus", "(", "fn", "(", "x", "y", ")", "(", "+", "x", "y", ")", ")", ")"].iter().peekable()));
     }
 
 }
