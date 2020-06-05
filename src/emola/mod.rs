@@ -92,6 +92,39 @@ pub fn parse<'a>(iterator: &mut std::iter::Peekable<std::slice::Iter<'_, &'a str
     }
 }
 
+use std::collections::HashMap;
+
+struct Env {
+    map: HashMap<String, Value>,
+    outer: Box<Env>
+}
+
+impl Env {
+    fn find(&self, key: String) -> Option<&Value> {
+        self.map.get(&key)
+    }
+
+    fn insert(&mut self, key: String, v: Value) {
+        self.map.insert(key, v);
+    }
+}
+
+type Callable = fn(Vec<Value>) -> Value;
+
+pub enum Value<'a> {
+    String(&'a str),
+    Callable(Callable)
+}
+
+fn eval<'a, A>(t: Tree<&'a str>, env: Env) -> Value {
+    match t {
+        Tree::Leaf(l) => Value::String(l),
+        Tree::Node(v) => {
+            Value::Int(32)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
