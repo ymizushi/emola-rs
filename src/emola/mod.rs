@@ -115,6 +115,7 @@ use std::cmp::PartialEq;
 #[derive(Clone)]
 pub enum Value<'a> {
     String(&'a str),
+    Symbol(&'a str),
     Callable(Callable),
     Int(i32)
 }
@@ -136,7 +137,8 @@ impl<'a> std::fmt::Debug for Value<'a> {
         let result = match self {
             Self::String(s) => String::from(""),
             Self::Callable(s) => String::from("callable"),
-            Self::Int(i) => String::from("")
+            Self::Int(i) => String::from(""),
+            Self::Symbol(s) => String::from("")
         };
        f.debug_struct("Value")
          .field("content", &result)
@@ -147,7 +149,16 @@ impl<'a> std::fmt::Debug for Value<'a> {
 fn eval<'a>(t: Tree<&'a str>, env: &Env) -> Value<'a> {
     use Tree::*;
     match t {
-        Leaf(l) => Value::String(l),
+        Leaf(l) => {
+            if l.starts_with("\"") {
+                Value::String(l)
+            } else {
+                match l.parse() {
+                    Ok(x) => Value::Int(x),
+                    Err(_) => Value::Symbol(l)
+                }
+            }
+        },
         Node(v) => {
             match v[0] {
                 Leaf("+") => {
