@@ -90,12 +90,12 @@ pub fn parse<'a>(iterator: &mut std::iter::Peekable<std::slice::Iter<'_, &'a str
 use std::collections::HashMap;
 
 #[derive(PartialEq)]
-pub struct Env<'a, A> {
-    pub map: HashMap<String, Value<'a, A>>,
+pub struct Env<'a> {
+    pub map: HashMap<String, Value<'a>>,
 }
 
 use std::fmt;
-impl<'a, A> std::fmt::Debug for Env<'a, A> {
+impl<'a> std::fmt::Debug for Env<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
        f.debug_struct("Env")
          .field("map", &"map")
@@ -103,12 +103,12 @@ impl<'a, A> std::fmt::Debug for Env<'a, A> {
     }
 }
 
-impl<'a, A> Env<'a, A> {
-    fn find(&self, key: String) -> Option<&Value<A>> {
+impl<'a> Env<'a> {
+    fn find(&self, key: String) -> Option<&Value> {
         self.map.get(&key)
     }
 
-    fn insert(&mut self, key: String, v: Value<'a, A>) {
+    fn insert(&mut self, key: String, v: Value<'a>) {
         self.map.insert(key, v);
     }
 }
@@ -122,45 +122,54 @@ pub enum Tree<T> {
 use std::cmp::PartialEq;
 
 #[derive(Debug, PartialEq)]
-pub enum Value<'a, A> {
+pub enum Value<'a> {
     String(&'a str),
     Symbol(&'a str),
-    Callable(Tree<A>, Env<'a, A>),
+    Callable(Tree<&'a str>, Env<'a>),
     Int(i32)
 }
 
 
+fn to_value(l: &str) -> Value {
+    if l.starts_with("\"") {
+        Value::String(l)
+    } else {
+        match l.parse() {
+            Ok(x) => Value::Int(x),
+            Err(_) => Value::Symbol(l)
+        }
+    }
+}
 
-pub fn eval<'a, A>(t: Tree<&'a str>, env: &Env<A>) -> Value<'a, A> {
+fn adder<'a>(v: Vec<Tree<&'a str>>, env: &Env) -> Value<'a> {
+    v.iter()
+        .map(|x| eval(x.clone(), &env))
+        .map(|x| {
+            match x {
+                Value::Int(i) => i,
+                _ => panic!("")
+            }
+        })
+        .fold(Value::Int(0), |acc, x| {
+            match acc {
+                Value::Int(i) => Value::Int(i+x),
+                _ => panic!("")
+            }
+        })
+
+
+}
+
+pub fn eval<'a>(t: Tree<&'a str>, env: &Env) -> Value<'a> {
     use Tree::*;
     match t {
         Leaf(l) => {
-            if l.starts_with("\"") {
-                Value::String(l)
-            } else {
-                match l.parse() {
-                    Ok(x) => Value::Int(x),
-                    Err(_) => Value::Symbol(l)
-                }
-            }
+            to_value(l)
         },
         Node(v) => {
             match v[0] {
                 Leaf("+") => {
-                    v[1..].iter()
-                        .map(|x| eval(x.clone(), env))
-                        .map(|x| {
-                            match x {
-                                Value::Int(i) => i,
-                                _ => panic!("")
-                            }
-                        })
-                        .fold(Value::Int(0), |acc, x| {
-                            match acc {
-                                Value::Int(i) => Value::Int(i+x),
-                                _ => panic!("")
-                            }
-                        })
+                    adder(v[1..].to_vec(), env)
                 },
                 _ => {
                     Value::Int(32)
@@ -168,7 +177,6 @@ pub fn eval<'a, A>(t: Tree<&'a str>, env: &Env<A>) -> Value<'a, A> {
 
             }
         }
-        
     }
 }
 
@@ -195,7 +203,7 @@ mod tests {
     #[test]
     fn test_eval() {
         assert_eq!(
-            Value::Int::<i32>(7),
+            Value::Int(7),
             eval(
                 parse(&mut vec!["(", "+", "2", "5", ")"].iter().peekable()),
                 &Env {
