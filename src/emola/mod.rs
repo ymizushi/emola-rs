@@ -89,8 +89,8 @@ pub fn parse<'a>(iterator: &mut std::iter::Peekable<std::slice::Iter<'_, &'a str
 
 use std::collections::HashMap;
 
-struct Env<'a> {
-    map: HashMap<String, Value<'a>>,
+pub struct Env<'a> {
+    pub map: HashMap<String, Value<'a>>,
 }
 
 impl<'a> Env<'a> {
@@ -134,11 +134,11 @@ impl<'a> PartialEq for Value<'a> {
 use std::fmt;
 impl<'a> std::fmt::Debug for Value<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let result = match self {
-            Self::String(s) => String::from(""),
+        let result: String = match self {
+            Self::String(s) => String::from(*s),
             Self::Callable(s) => String::from("callable"),
-            Self::Int(i) => String::from(""),
-            Self::Symbol(s) => String::from("")
+            Self::Int(i) => i.to_string(),
+            Self::Symbol(s) => s.to_string()
         };
        f.debug_struct("Value")
          .field("content", &result)
@@ -146,7 +146,7 @@ impl<'a> std::fmt::Debug for Value<'a> {
     }
 }
 
-fn eval<'a>(t: Tree<&'a str>, env: &Env) -> Value<'a> {
+pub fn eval<'a>(t: Tree<&'a str>, env: &Env) -> Value<'a> {
     use Tree::*;
     match t {
         Leaf(l) => {
@@ -206,14 +206,16 @@ mod tests {
         assert_eq!(
             Node(vec![Leaf("def"), Leaf("plus"), Node(vec![Leaf("fn"), Node(vec![Leaf("x"), Leaf("y")]), Node(vec![Leaf("+"), Leaf("x"), Leaf("y")])])])
             , parse(&mut vec!["(", "def", "plus", "(", "fn", "(", "x", "y", ")", "(", "+", "x", "y", ")", ")", ")"].iter().peekable()));
+        assert_eq!(
+            Node(vec![Leaf("def"), Leaf("plus"), Node(vec![Leaf("fn"), Node(vec![Leaf("x"), Leaf("y")]), Node(vec![Leaf("+"), Leaf("x"), Leaf("y")])])])
+            , parse(&mut vec!["(", "+", "2", "5", ")"].iter().peekable()));
     }
-    #[test]
     fn test_eval() {
         use super::Value::*;
         assert_eq!(
             Value::Int(32),
             eval(
-                parse(&mut vec!["(", "+", "1", "2", ")"].iter().peekable()),
+                parse(&mut vec!["(", "+", "2", "5", ")"].iter().peekable()),
                 &Env {
                     map: HashMap::new()
                 }
