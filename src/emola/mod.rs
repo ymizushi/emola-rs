@@ -89,21 +89,29 @@ pub fn parse<'a>(iterator: &mut std::iter::Peekable<std::slice::Iter<'_, &'a str
 
 use std::collections::HashMap;
 
-pub struct Env<'a> {
-    pub map: HashMap<String, Value<'a>>,
+#[derive(PartialEq)]
+pub struct Env<'a, A> {
+    pub map: HashMap<String, Value<'a, A>>,
 }
 
-impl<'a> Env<'a> {
-    fn find(&self, key: String) -> Option<&Value> {
+use std::fmt;
+impl<'a, A> std::fmt::Debug for Env<'a, A> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+       f.debug_struct("Env")
+         .field("map", &"map")
+         .finish()
+    }
+}
+
+impl<'a, A> Env<'a, A> {
+    fn find(&self, key: String) -> Option<&Value<A>> {
         self.map.get(&key)
     }
 
-    fn insert(&mut self, key: String, v: Value<'a>) {
+    fn insert(&mut self, key: String, v: Value<'a, A>) {
         self.map.insert(key, v);
     }
 }
-
-type Callable = fn(Vec<Value>) -> Value;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Tree<T> {
@@ -112,41 +120,18 @@ pub enum Tree<T> {
 }
 
 use std::cmp::PartialEq;
-#[derive(Clone)]
-pub enum Value<'a> {
+
+#[derive(Debug, PartialEq)]
+pub enum Value<'a, A> {
     String(&'a str),
     Symbol(&'a str),
-    Callable(Callable),
+    Callable(Tree<A>, Env<'a, A>),
     Int(i32)
 }
 
-impl<'a> PartialEq for Value<'a> {
-    fn eq(&self, other: &Self) -> bool {
-        match self {
-            Self::String(_)| Self::Int(_) => {
-                self == other
-            }
-            _ => false
-        }
-    }
-}
 
-use std::fmt;
-impl<'a> std::fmt::Debug for Value<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let result: String = match self {
-            Self::String(s) => String::from(*s),
-            Self::Callable(s) => String::from("callable"),
-            Self::Int(i) => i.to_string(),
-            Self::Symbol(s) => s.to_string()
-        };
-       f.debug_struct("Value")
-         .field("content", &result)
-         .finish()
-    }
-}
 
-pub fn eval<'a>(t: Tree<&'a str>, env: &Env) -> Value<'a> {
+pub fn eval<'a, A>(t: Tree<&'a str>, env: &Env<A>) -> Value<'a, A> {
     use Tree::*;
     match t {
         Leaf(l) => {
@@ -206,14 +191,11 @@ mod tests {
         assert_eq!(
             Node(vec![Leaf("def"), Leaf("plus"), Node(vec![Leaf("fn"), Node(vec![Leaf("x"), Leaf("y")]), Node(vec![Leaf("+"), Leaf("x"), Leaf("y")])])])
             , parse(&mut vec!["(", "def", "plus", "(", "fn", "(", "x", "y", ")", "(", "+", "x", "y", ")", ")", ")"].iter().peekable()));
-        assert_eq!(
-            Node(vec![Leaf("def"), Leaf("plus"), Node(vec![Leaf("fn"), Node(vec![Leaf("x"), Leaf("y")]), Node(vec![Leaf("+"), Leaf("x"), Leaf("y")])])])
-            , parse(&mut vec!["(", "+", "2", "5", ")"].iter().peekable()));
     }
+    #[test]
     fn test_eval() {
-        use super::Value::*;
         assert_eq!(
-            Value::Int(32),
+            Value::Int::<i32>(7),
             eval(
                 parse(&mut vec!["(", "+", "2", "5", ")"].iter().peekable()),
                 &Env {

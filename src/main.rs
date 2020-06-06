@@ -4,7 +4,7 @@ use emola_rs::emola::{parse, eval, Env};
 use std::collections::HashMap;
 
 fn main() {
-    let result = eval(
+    let result = eval::<i32>(
         parse(&mut vec!["(", "+", "2", "5", ")"].iter().peekable()),
         &Env {
             map: HashMap::new()
