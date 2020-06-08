@@ -1,9 +1,10 @@
 use std::cmp::PartialEq;
+use std::cell::RefCell;
 use std::collections::HashMap;
 
 use super::parse::Tree;
 
-#[derive(PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct Env<'a> {
     pub map: HashMap<String, Value<'a>>,
 }
@@ -18,12 +19,13 @@ impl<'a> Env<'a> {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Value<'a> {
     String(&'a str),
     Symbol(&'a str),
-    Callable(Tree<&'a str>, &'a RefCell<Env<'a>>),
+    Callable(Tree<&'a str>),
     Int(i32),
+    Bool(bool),
     Nil,
 }
 
@@ -31,12 +33,30 @@ pub fn eval<'a>(t: &Tree<&'a str>, env: &'a RefCell<Env<'a>>) -> Value<'a> {
     use Tree::*;
     match t {
         Leaf(l) => {
-            to_value(l)
+            to_value(l, env)
         },
         Node(v) => {
-            match v[0] {
+            match v[0].clone() {
+                Leaf("begin") => {
+                    begin_exp(v[1..].to_vec(), env)
+                },
+                Leaf("if") => {
+                    if_exp(v[1..].to_vec(), env)
+                },
+                Leaf("=") => {
+                    equal_exp(v[1..].to_vec(), env)
+                },
                 Leaf("+") => {
                     adder(v[1..].to_vec(), env)
+                },
+                Leaf("-") => {
+                    subber(v[1..].to_vec(), env)
+                },
+                Leaf("*") => {
+                    muller(v[1..].to_vec(), env)
+                },
+                Leaf("/") => {
+                    divider(v[1..].to_vec(), env)
                 },
                 Leaf("fn") => {
                     function(v[..].to_vec(), env)
@@ -47,13 +67,18 @@ pub fn eval<'a>(t: &Tree<&'a str>, env: &'a RefCell<Env<'a>>) -> Value<'a> {
                 Leaf(s) => {
                     match env.borrow_mut().get(String::from(s)) {
                         Some(value) => {
-                            Value::Nil
+                            match value {
+                                // Value::Callable(v) => {
+                                //     exec(*v, env)
+                                // }
+                                _ => panic!("unknown syntax")
+                            }
                         },
                         None => panic!("unknown keyword")
                     }
                 }
-                Node(_) => {
-                    panic!("unknown keyword");
+                Node(n) => {
+                    Value::Nil
                 }
 
             }
@@ -61,18 +86,28 @@ pub fn eval<'a>(t: &Tree<&'a str>, env: &'a RefCell<Env<'a>>) -> Value<'a> {
     }
 }
 
-fn to_value(l: &str) -> Value {
+fn to_value<'a>(l: &'a str, env: &'a RefCell<Env<'a>>) -> Value<'a> {
     if l.starts_with("\"") {
         Value::String(l)
     } else {
         match l.parse() {
             Ok(x) => Value::Int(x),
-            Err(_) => Value::Symbol(l)
+            Err(_) => {
+                if l == "true" {
+                    Value::Bool(true)
+                } else if l == "false" {
+                    Value::Bool(false)
+                } else {
+                    match env.borrow_mut().get(String::from(l)) {
+                        Some(s) => s.clone(),
+                        None => panic!("Unknown name")
+                    }
+                }
+            }
         }
     }
 }
 
-use std::cell::RefCell;
 
 fn adder<'a>(v: Vec<Tree<&'a str>>, ev: &'a RefCell<Env<'a>>) -> Value<'a> {
     v.iter()
@@ -91,9 +126,113 @@ fn adder<'a>(v: Vec<Tree<&'a str>>, ev: &'a RefCell<Env<'a>>) -> Value<'a> {
         })
 }
 
-fn function<'a>(v: Vec<Tree<&'a str>>, env: &'a RefCell<Env<'a>>) -> Value<'a> {
-    Value::Callable(Tree::Node(v), env)
+fn subber<'a>(v: Vec<Tree<&'a str>>, ev: &'a RefCell<Env<'a>>) -> Value<'a> {
+    v.iter()
+        .map(|x| eval(x, ev))
+        .map(|x| {
+            match x {
+                Value::Int(i) => i,
+                _ => panic!("")
+            }
+        })
+        .enumerate()
+        .fold(Value::Int(0), |acc, (index, x)| {
+            match acc {
+                Value::Int(i) =>  {
+                    if index == 0 {
+                        Value::Int(i+x)
+                    } else {
+                        Value::Int(i-x)
+                    }
+                }
+                _ => panic!("")
+            }
+        })
 }
+
+fn muller<'a>(v: Vec<Tree<&'a str>>, ev: &'a RefCell<Env<'a>>) -> Value<'a> {
+    v.iter()
+        .map(|x| eval(x, ev))
+        .map(|x| {
+            match x {
+                Value::Int(i) => i,
+                _ => panic!("")
+            }
+        })
+        .fold(Value::Int(0), |acc, x| {
+            match acc {
+                Value::Int(i) => Value::Int(i*x),
+                _ => panic!("")
+            }
+        })
+}
+
+
+fn divider<'a>(v: Vec<Tree<&'a str>>, ev: &'a RefCell<Env<'a>>) -> Value<'a> {
+    v.iter()
+        .map(|x| eval(x, ev))
+        .map(|x| {
+            match x {
+                Value::Int(i) => i,
+                _ => panic!("")
+            }
+        })
+        .fold(Value::Int(0), |acc, x| {
+            match acc {
+                Value::Int(i) => Value::Int(i/x),
+                _ => panic!("")
+            }
+        })
+}
+fn function<'a>(v: Vec<Tree<&'a str>>, env: &'a RefCell<Env<'a>>) -> Value<'a> {
+    Value::Callable(Tree::Node(v))
+}
+
+fn begin_exp<'a>(v: Vec<Tree<&'a str>>, env: &'a RefCell<Env<'a>>) -> Value<'a> {
+    for (i, e) in v.iter().enumerate() {
+        if i == v.len() -1 {
+            return eval(&e, env)
+        } else {
+            eval(&e, env);
+        }
+    }
+    Value::Nil
+}
+
+fn if_exp<'a>(v: Vec<Tree<&'a str>>, env: &'a RefCell<Env<'a>>) -> Value<'a> {
+    if eval(&v[0], env) == Value::Bool(true) {
+        eval(&v[1], env)
+    } else {
+        eval(&v[2], env)
+    }
+}
+
+fn equal_exp<'a>(v: Vec<Tree<&'a str>>, env: &'a RefCell<Env<'a>>) -> Value<'a> {
+    if eval(&v[0], env) == eval(&v[1], env) {
+        Value::Bool(true)
+    } else {
+        Value::Bool(false)
+    }
+}
+
+
+// fn exec<'a>(t: Tree<&'a str>, env: &'a RefCell<Env<'a>>) -> Value<'a> {
+//     let localEnv = Env { map: HashMap::new() };
+//     match t {
+//         Tree::Leaf(l) => panic!("invalid syntax"),
+//         Tree::Node(v) => {
+//             match (v[1], v[2]) {
+//                 (Tree::Node(v1), Tree::Node(v2)) =>{
+//                     v1.into_iter().map(|x| {
+//                         match x {
+//                         }
+//                     })
+// 
+//                 }
+//             }
+//         }
+//     }
+// }
 
 fn define<'a>(v: Vec<Tree<&'a str>>, ev: &'a RefCell<Env<'a>>) -> Value<'a> {
     match (v[0].clone(), v[1].clone()) {
@@ -109,10 +248,10 @@ fn define<'a>(v: Vec<Tree<&'a str>>, ev: &'a RefCell<Env<'a>>) -> Value<'a> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use super::super::parse::parse;
     #[test]
     fn test_eval() {
-        use super::*;
-        use super::super::parse::parse;
         assert_eq!(
             Value::Int(7),
             eval(
@@ -122,25 +261,69 @@ mod tests {
                 })
             )
         );
+    }
 
+    #[test]
+    fn test_eval_plus() {
+        let env1 = &RefCell::new(Env {
+            map: HashMap::new()
+        });
+        let result = eval(&parse(&mut vec!["(", "def", "hoge", "5", ")"].iter().peekable()), env1);
         assert_eq!(
             Value::Nil,
-            eval(
-                &parse(&mut vec!["(", "def", "hoge", "1", ")"].iter().peekable()),
-                &RefCell::new(Env {
-                    map: HashMap::new()
-                })
-            )
+            result
+        );
+        assert_eq!(
+            &Value::Int(5),
+            env1.borrow().map.get(&"hoge".to_string()).unwrap()
         );
 
+    }
+
+    #[test]
+    fn test_eval_def_fn() {
+        use super::super::parse::Tree::{Node, Leaf};
+        let env = &RefCell::new(Env {
+            map: HashMap::new()
+        });
+        let result = eval(&parse(&mut vec!["(", "def", "hoge", "(", "fn", "(", "x", "y", ")", "(", "+", "x", "y", ")", ")", ")"].iter().peekable()), env);
+
         assert_eq!(
             Value::Nil,
-            eval(
-                &parse(&mut vec!["(", "def", "hoge", "(", "fn", "(", "x", "y", ")", "(", "+", "x", "y", ")", ")", ")"].iter().peekable()),
-                &RefCell::new(Env {
-                    map: HashMap::new()
-                })
-            )
+            result
+        );
+    }
+    #[test]
+    fn test_eval_if() {
+        use super::super::parse::Tree::{Node, Leaf};
+        let env = &RefCell::new(Env {
+            map: HashMap::new()
+        });
+        let result = eval(&parse(&mut vec!["(", "if", "(", "=", "1", "1", ")", "(", "+", "1", "2", ")", "(", "-", "1", "2", ")", ")"].iter().peekable()), env);
+
+        assert_eq!(
+            Value::Int(3),
+            result
+        );
+
+        let result2 = eval(&parse(&mut vec!["(", "if", "(", "=", "1", "2", ")", "(", "+", "1", "2", ")", "(", "-", "1", "2", ")", ")"].iter().peekable()), env);
+        assert_eq!(
+            Value::Int(-1),
+            result2
+        );
+    }
+
+    #[test]
+    fn test_eval_begin() {
+        use super::super::parse::Tree::{Node, Leaf};
+        let env = &RefCell::new(Env {
+            map: HashMap::new()
+        });
+        let result = eval(&parse(&mut vec!["(", "begin", "(", "def", "hoge", "1", ")", "(", "+", "hoge", "2", ")", ")"].iter().peekable()), env);
+
+        assert_eq!(
+            Value::Int(3),
+            result
         );
     }
 }
