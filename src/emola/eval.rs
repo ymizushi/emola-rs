@@ -29,6 +29,23 @@ pub enum Value<'a> {
     Nil,
 }
 
+use std::fmt;
+
+impl<'a> fmt::Display for Value<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Value::String(s) => write!(f, "Value: {}", s),
+            Value::Symbol(s) => write!(f, "Value: {}", s),
+            Value::Callable(_) => write!(f, "Value: {}", "Fn"),
+            Value::Int(i) => write!(f, "Value: {}", i),
+            Value::Bool(b) => write!(f, "Value: {}", b),
+            Value::Nil => write!(f, "Value: {}", "Nill")
+
+        }
+        
+    }
+}
+
 pub fn eval<'a>(t: &Tree<&'a str>, env: &'a RefCell<Env<'a>>) -> Value<'a> {
     use Tree::*;
     match t {
