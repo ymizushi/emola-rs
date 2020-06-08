@@ -1,5 +1,5 @@
 use super::token::tokenize;
-use super::parse::{parse, Tree};
+use super::parse::parse;
 use super::eval::{Env, eval};
 
 use std::cell::RefCell;
@@ -10,9 +10,9 @@ pub fn read<'a>() {
     loop {
         let mut buff = String::new();
         io::stdin().read_line(&mut buff).unwrap();
-        let tokenized_before = tokenize(&buff);
-        let tokenized: Vec<&str> = tokenized_before.iter().map(|x| x.as_str()).collect::<Vec<&str>>();
-        let mut tokens = tokenized.iter().peekable();
+        let tokens = tokenize(&buff);
+        let tokens = tokens.iter().map(|x| x.as_str()).collect::<Vec<&str>>();
+        let mut tokens = tokens.iter().peekable();
         let treee = parse(&mut tokens);
 
         let env = &RefCell::new(Env {
