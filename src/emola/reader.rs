@@ -4,11 +4,13 @@ use super::eval::{Env, eval};
 
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::io;
+use std::io::{self, Write};
 
 pub fn read<'a>() {
     loop {
         let mut buff = String::new();
+        print!("> ");
+        io::stdout().flush().unwrap();
         io::stdin().read_line(&mut buff).unwrap();
         let tokens = tokenize(&buff);
         let tokens = tokens.iter().map(|x| x.as_str()).collect::<Vec<&str>>();
@@ -19,6 +21,6 @@ pub fn read<'a>() {
             map: HashMap::new()
         });
         let result = eval(&treee, env);
-        println!("{}",result);
+        println!("> {}",result);
     }
 }
